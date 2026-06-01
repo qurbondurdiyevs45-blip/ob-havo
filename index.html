@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Ob-havo ilovasi</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #6dd5ed 100%);
+    display: flex; justify-content: center;
+    padding: 20px; color: #fff;
+  }
+  .app {
+    width: 100%; max-width: 480px;
+    background: rgba(255,255,255,0.12);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 24px;
+    padding: 24px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    height: fit-content;
+  }
+  h1 { font-size: 22px; margin-bottom: 16px; text-align: center; font-weight: 600; }
+  .search { display: flex; gap: 8px; margin-bottom: 12px; }
+  input {
+    flex: 1; padding: 12px 16px; border-radius: 12px; border: none;
+    background: rgba(255,255,255,0.2); color: #fff; font-size: 15px; outline: none;
+  }
+  input::placeholder { color: rgba(255,255,255,0.7); }
+  button {
+    padding: 12px 16px; border: none; border-radius: 12px;
+    background: #fff; color: #1e3c72; font-weight: 600; cursor: pointer;
+    transition: transform 0.15s; font-size: 14px;
+  }
+  button:hover { transform: scale(1.05); }
+  .geo-btn {
+    width: 100%; margin-bottom: 18px;
+    background: rgba(255,255,255,0.2); color: #fff;
+  }
+  .current { text-align: center; padding: 8px 0 16px; }
+  .city { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+  .date { font-size: 13px; opacity: 0.85; margin-bottom: 10px; }
+  .icon { font-size: 78px; line-height: 1; margin: 6px 0; }
+  .temp { font-size: 60px; font-weight: 300; }
+  .desc { font-size: 17px; opacity: 0.95; margin-top: 4px; }
+  .minmax { font-size: 14px; opacity: 0.85; margin-top: 4px; }
+  .details {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0;
+  }
+  .detail {
+    background: rgba(255,255,255,0.1); padding: 12px;
+    border-radius: 12px; display: flex; align-items: center; gap: 10px;
+  }
+  .detail-icon { font-size: 22px; }
+  .detail-label { font-size: 11px; opacity: 0.75; text-transform: uppercase; }
+  .detail-value { font-size: 15px; font-weight: 600; }
+  .section-title {
+    font-size: 13px; opacity: 0.85; margin: 18px 0 10px;
+    text-transform: uppercase; letter-spacing: 1px; font-weight: 600;
+  }
+  .hourly {
+    display: flex; gap: 10px; overflow-x: auto; padding-bottom: 8px;
+    scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.3) transparent;
+  }
+  .hourly::-webkit-scrollbar { height: 6px; }
+  .hourly::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
+  .hour {
+    flex: 0 0 auto; min-width: 64px;
+    background: rgba(255,255,255,0.1); padding: 10px 8px;
+    border-radius: 12px; text-align: center;
+  }
+  .hour-time { font-size: 11px; opacity: 0.8; }
+  .hour-icon { font-size: 22px; margin: 4px 0; }
+  .hour-temp { font-size: 14px; font-weight: 600; }
+  .days, .months { display: flex; flex-direction: column; gap: 6px; }
+  .day, .month-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; background: rgba(255,255,255,0.08); border-radius: 12px;
+  }
+  .day-name, .month-name { flex: 1; font-weight: 500; font-size: 14px; }
+  .day-icon { font-size: 22px; width: 32px; text-align: center; }
+  .day-temp { font-weight: 600; min-width: 90px; text-align: right; font-size: 14px; }
+  .day-temp .min { opacity: 0.6; }
+  .tabs { display: flex; gap: 6px; margin: 16px 0 10px; }
+  .tab {
+    flex: 1; padding: 8px; background: rgba(255,255,255,0.1);
+    border: none; border-radius: 10px; color: #fff; font-size: 12px;
+    cursor: pointer; font-weight: 600;
+  }
+  .tab.active { background: rgba(255,255,255,0.3); }
+  .loading, .error { text-align: center; padding: 30px; opacity: 0.9; }
+  .error { color: #ffcdd2; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🌤️ Ob-havo</h1>
+  <div class="search">
+    <input id="cityInput" type="text" placeholder="Shahar nomini kiriting..." />
+    <button id="searchBtn">Qidirish</button>
+  </div>
+  <button id="geoBtn" class="geo-btn">📍 Mening joylashuvim</button>
+  <div id="content"><div class="loading">Yuklanmoqda...</div></div>
+</div>
+
+<script>
+const WEATHER_CODES = {
+  0: { d: "Quyoshli", i: "☀️" },
+  1: { d: "Asosan quyoshli", i: "🌤️" },
+  2: { d: "Qisman bulutli", i: "⛅" },
+  3: { d: "Bulutli", i: "☁️" },
+  45: { d: "Tuman", i: "🌫️" }, 48: { d: "Muzli tuman", i: "🌫️" },
+  51: { d: "Yengil shivalama", i: "🌦️" }, 53: { d: "Shivalama", i: "🌦️" }, 55: { d: "Kuchli shivalama", i: "🌧️" },
+  61: { d: "Yengil yomg'ir", i: "🌦️" }, 63: { d: "Yomg'ir", i: "🌧️" }, 65: { d: "Kuchli yomg'ir", i: "🌧️" },
+  71: { d: "Yengil qor", i: "🌨️" }, 73: { d: "Qor", i: "❄️" }, 75: { d: "Kuchli qor", i: "❄️" },
+  77: { d: "Qor donalari", i: "🌨️" },
+  80: { d: "Yomg'ir", i: "🌦️" }, 81: { d: "Yomg'ir", i: "🌧️" }, 82: { d: "Kuchli yomg'ir", i: "⛈️" },
+  85: { d: "Qor", i: "🌨️" }, 86: { d: "Kuchli qor", i: "❄️" },
+  95: { d: "Momaqaldiroq", i: "⛈️" }, 96: { d: "Do'lli momaqaldiroq", i: "⛈️" }, 99: { d: "Kuchli momaqaldiroq", i: "⛈️" }
+};
+const DAYS = ["Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba"];
+const DAYS_SHORT = ["Yak","Dush","Sesh","Chor","Pay","Juma","Shan"];
+const MONTHS = ["Yanvar","Fevral","Mart","Aprel","May","Iyun","Iyul","Avgust","Sentyabr","Oktyabr","Noyabr","Dekabr"];
+
+const content = document.getElementById('content');
+const input = document.getElementById('cityInput');
+const btn = document.getElementById('searchBtn');
+const geoBtn = document.getElementById('geoBtn');
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
+
+async function getWeatherByCoords(lat, lon, label) {
+  content.innerHTML = '<div class="loading">Yuklanmoqda...</div>';
+  try {
+    let name = label;
+    if (!name) {
+      const rev = await fetch(`https://geocoding-api.open-meteo.com/v1/reverse?latitude=${lat}&longitude=${lon}&language=uz`).then(r => r.json()).catch(() => null);
+      if (rev && rev.results && rev.results[0]) {
+        name = `${rev.results[0].name}, ${rev.results[0].country || ''}`;
+      } else {
+        name = `${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+      }
+    }
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+      + `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,pressure_msl`
+      + `&hourly=temperature_2m,weather_code`
+      + `&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,uv_index_max`
+      + `&timezone=auto&forecast_days=16`;
+    const w = await fetch(url).then(r => r.json());
+    render(name, w);
+  } catch (e) {
+    content.innerHTML = '<div class="error">Xatolik yuz berdi. Internetni tekshiring.</div>';
+  }
+}
+
+async function getWeatherByCity(city) {
+  content.innerHTML = '<div class="loading">Yuklanmoqda...</div>';
+  try {
+    const geo = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=uz`).then(r => r.json());
+    if (!geo.results || geo.results.length === 0) {
+      content.innerHTML = '<div class="error">Shahar topilmadi.</div>';
+      return;
+    }
+    const r = geo.results[0];
+    getWeatherByCoords(r.latitude, r.longitude, `${r.name}, ${r.country || ''}`);
+  } catch (e) {
+    content.innerHTML = '<div class="error">Xatolik yuz berdi.</div>';
+  }
+}
+
+function detectLocation() {
+  content.innerHTML = '<div class="loading">Joylashuv aniqlanmoqda...</div>';
+  if (!navigator.geolocation) return fallbackIP();
+  navigator.geolocation.getCurrentPosition(
+    pos => getWeatherByCoords(pos.coords.latitude, pos.coords.longitude),
+    () => fallbackIP(),
+    { timeout: 8000 }
+  );
+}
+
+async function fallbackIP() {
+  try {
+    const r = await fetch('https://ipapi.co/json/').then(r => r.json());
+    if (r.latitude && r.longitude) {
+      getWeatherByCoords(r.latitude, r.longitude, `${r.city || ''}, ${r.country_name || ''}`);
+    } else { getWeatherByCity('Tashkent'); }
+  } catch { getWeatherByCity('Tashkent'); }
+}
+
+function render(name, w) {
+  const cur = w.current;
+  const code = WEATHER_CODES[cur.weather_code] || { d: "Noma'lum", i: "🌡️" };
+  const now = new Date();
+  const dateStr = `${DAYS[now.getDay()]}, ${now.getDate()}-${MONTHS[now.getMonth()]}`;
+  const todayMax = Math.round(w.daily.temperature_2m_max[0]);
+  const todayMin = Math.round(w.daily.temperature_2m_min[0]);
+  const sunrise = fmtTime(w.daily.sunrise[0]);
+  const sunset = fmtTime(w.daily.sunset[0]);
+
+  // Hourly — next 24h
+  const nowIdx = w.hourly.time.findIndex(t => new Date(t) >= now);
+  const startIdx = nowIdx === -1 ? 0 : nowIdx;
+  let hourlyHtml = '';
+  for (let i = startIdx; i < Math.min(startIdx + 24, w.hourly.time.length); i++) {
+    const t = new Date(w.hourly.time[i]);
+    const hc = WEATHER_CODES[w.hourly.weather_code[i]] || { i: "🌡️" };
+    hourlyHtml += `
+      <div class="hour">
+        <div class="hour-time">${t.getHours().toString().padStart(2,'0')}:00</div>
+        <div class="hour-icon">${hc.i}</div>
+        <div class="hour-temp">${Math.round(w.hourly.temperature_2m[i])}°</div>
+      </div>`;
+  }
+
+  // 7 days
+  let daysHtml = '';
+  for (let i = 0; i < Math.min(7, w.daily.time.length); i++) {
+    const d = new Date(w.daily.time[i]);
+    const dc = WEATHER_CODES[w.daily.weather_code[i]] || { i: "🌡️" };
+    const label = i === 0 ? 'Bugun' : DAYS[d.getDay()];
+    daysHtml += `
+      <div class="day">
+        <span class="day-name">${label}</span>
+        <span class="day-icon">${dc.i}</span>
+        <span class="day-temp">${Math.round(w.daily.temperature_2m_max[i])}° <span class="min">${Math.round(w.daily.temperature_2m_min[i])}°</span></span>
+      </div>`;
+  }
+
+  // Monthly (up to 16 days from API)
+  let monthHtml = '';
+  for (let i = 0; i < w.daily.time.length; i++) {
+    const d = new Date(w.daily.time[i]);
+    const dc = WEATHER_CODES[w.daily.weather_code[i]] || { i: "🌡️" };
+    monthHtml += `
+      <div class="month-row">
+        <span class="day-name">${d.getDate()}-${MONTHS[d.getMonth()].slice(0,3)} (${DAYS_SHORT[d.getDay()]})</span>
+        <span class="day-icon">${dc.i}</span>
+        <span class="day-temp">${Math.round(w.daily.temperature_2m_max[i])}° <span class="min">${Math.round(w.daily.temperature_2m_min[i])}°</span></span>
+      </div>`;
+  }
+
+  content.innerHTML = `
+    <div class="current">
+      <div class="city">${name}</div>
+      <div class="date">${dateStr}</div>
+      <div class="icon">${code.i}</div>
+      <div class="temp">${Math.round(cur.temperature_2m)}°C</div>
+      <div class="desc">${code.d}</div>
+      <div class="minmax">↑ ${todayMax}°  ↓ ${todayMin}°  •  His etish: ${Math.round(cur.apparent_temperature)}°</div>
+    </div>
+
+    <div class="details">
+      <div class="detail"><span class="detail-icon">💧</span><div><div class="detail-label">Namlik</div><div class="detail-value">${cur.relative_humidity_2m}%</div></div></div>
+      <div class="detail"><span class="detail-icon">💨</span><div><div class="detail-label">Shamol</div><div class="detail-value">${Math.round(cur.wind_speed_10m)} km/s</div></div></div>
+      <div class="detail"><span class="detail-icon">🌅</span><div><div class="detail-label">Quyosh chiqishi</div><div class="detail-value">${sunrise}</div></div></div>
+      <div class="detail"><span class="detail-icon">🌇</span><div><div class="detail-label">Quyosh botishi</div><div class="detail-value">${sunset}</div></div></div>
+      <div class="detail"><span class="detail-icon">☔</span><div><div class="detail-label">Yog'in</div><div class="detail-value">${w.daily.precipitation_sum[0]} mm</div></div></div>
+      <div class="detail"><span class="detail-icon">☀️</span><div><div class="detail-label">UV indeks</div><div class="detail-value">${Math.round(w.daily.uv_index_max[0] || 0)}</div></div></div>
+    </div>
+
+    <div class="section-title">Soatlik (24 soat)</div>
+    <div class="hourly">${hourlyHtml}</div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="week">7 kunlik</button>
+      <button class="tab" data-tab="month">16 kunlik</button>
+    </div>
+    <div id="tab-week" class="days">${daysHtml}</div>
+    <div id="tab-month" class="months hidden">${monthHtml}</div>
+  `;
+
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      const tab = t.dataset.tab;
+      document.getElementById('tab-week').classList.toggle('hidden', tab !== 'week');
+      document.getElementById('tab-month').classList.toggle('hidden', tab !== 'month');
+    });
+  });
+}
+
+btn.addEventListener('click', () => { if (input.value.trim()) getWeatherByCity(input.value.trim()); });
+input.addEventListener('keypress', e => { if (e.key === 'Enter' && input.value.trim()) getWeatherByCity(input.value.trim()); });
+geoBtn.addEventListener('click', detectLocation);
+
+// Avtomatik joylashuvni aniqlash
+detectLocation();
+</script>
+</body>
+</html>
